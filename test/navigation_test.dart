@@ -59,7 +59,7 @@ void main() {
     expect(find.textContaining('Добро пожаловать'), findsOneWidget);
   });
 
-  testWidgets('Онбординг: заполнение → главная (дашборд, кнопка калорий)', (tester) async {
+  testWidgets('Онбординг: заполнение → главная (дашборд)', (tester) async {
     await tallSurface(tester);
     final appState = await createAppState();
     await tester.pumpWidget(MyApp(appState: appState));
@@ -76,7 +76,7 @@ void main() {
     await tester.tap(find.byKey(const Key('onboarding_done')));
     await tester.pumpAndSettle();
     expect(find.text('Иван'), findsWidgets);
-    expect(find.byKey(const Key('dashboard_calories')), findsOneWidget);
+    expect(find.text('Главная'), findsOneWidget);
   });
 
   testWidgets('Дашборд → ввод БМР → таблица КБЖУ', (tester) async {
@@ -95,8 +95,16 @@ void main() {
     await tester.enterText(find.byKey(const Key('onboarding_password2')), 'testpass12');
     await tester.tap(find.byKey(const Key('onboarding_done')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('dashboard_calories')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('dashboard_calories')));
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationDrawer),
+        matching: find.text('Питание'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Перейти к расчёту'));
     await tester.pumpAndSettle();
     expect(find.text('Данные для расчёта калорий'), findsOneWidget);
     await tester.tap(find.byKey(const Key('bmr_to_plan')));

@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_state.dart';
 import 'app_theme.dart';
-import 'bmr_entry_page.dart';
-import 'calorie_counter_page.dart';
+import 'food_diary_page.dart';
 import 'meal_plan_page.dart';
 import 'models/user_profile.dart';
 import 'personal_goal.dart';
@@ -14,7 +13,7 @@ import 'what_to_eat_page.dart';
 import 'workout_plan_page.dart';
 import 'workout_types.dart';
 
-enum _HomeSection { whatToEat, home, meal, workout }
+enum _HomeSection { whatToEat, home, calories, meal, workout }
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key, required this.appState});
@@ -29,38 +28,28 @@ class _DashboardPageState extends State<DashboardPage> {
   _HomeSection _section = _HomeSection.home;
   bool _railExpanded = false;
 
-  void _toCalories() {
-    final p = widget.appState.user;
-    if (p == null) return;
-    if (!p.canComputeBmr) {
-      Navigator.of(context).push(
-        PageRouteBuilder<void>(
-          pageBuilder: (c, a, b) => BmrEntryPage(appState: widget.appState),
-          transitionsBuilder: (c, a, s, w) {
-            return FadeTransition(opacity: a, child: w);
-          },
-        ),
-      );
-    } else {
-      final bmr = computeBmrMifflin(
-        weightKg: p.weight,
-        heightCm: p.heightCm!,
-        age: p.age,
-        gender: p.gender!,
-        activityMult: p.activityMult!,
-      );
-      Navigator.of(context).push(
-        PageRouteBuilder<void>(
-          pageBuilder: (c, a, b) => CalorieCounterPage(
-            bmr: bmr,
-            goal: p.goal!,
-          ),
-          transitionsBuilder: (c, a, s, w) {
-            return FadeTransition(opacity: a, child: w);
-          },
-        ),
-      );
+  @override
+  void initState() {
+    super.initState();
+    widget.appState.addListener(_onAppState);
+  }
+
+  @override
+  void dispose() {
+    widget.appState.removeListener(_onAppState);
+    super.dispose();
+  }
+
+  void _onAppState() {
+    if (!mounted) {
+      return;
     }
+    setState(() {
+      if (!widget.appState.hasMealPlan &&
+          (_section == _HomeSection.whatToEat || _section == _HomeSection.calories)) {
+        _section = _HomeSection.meal;
+      }
+    });
   }
 
   void _toSettings() {
@@ -84,61 +73,79 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (context, cons) {
         final wide = cons.maxWidth >= 900;
         if (wide) {
-          return Scaffold(
-            body: Row(
-              children: [
-                _DesktopRail(
-                  expanded: _railExpanded,
-                  onToggle: () {
-                    setState(() => _railExpanded = !_railExpanded);
-                  },
-                  section: _section,
-                  onSelect: (s) {
-                    setState(() => _section = s);
-                  },
+          return ListenableBuilder(
+            listenable: widget.appState,
+            builder: (context, _) {
+              return Scaffold(
+                body: Row(
+                  children: [
+                    _DesktopRail(
+                      expanded: _railExpanded,
+                      onToggle: () {
+                        setState(() => _railExpanded = !_railExpanded);
+                      },
+                      section: _section,
+                      nutritionUnlocked: widget.appState.hasMealPlan,
+                      onSelect: (s) {
+                        setState(() => _section = s);
+                      },
+                    ),
+                    Expanded(
+                      child: ListenableBuilder(
+                        listenable: widget.appState,
+                        builder: (context, _) {
+                          return _DashboardScaffold(
+                            appState: widget.appState,
+                            section: _section,
+                            onSettings: _toSettings,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: _DashboardScaffold(
-                    appState: widget.appState,
-                    section: _section,
-                    onCalories: _toCalories,
-                    onSettings: _toSettings,
-                  ),
-                ),
-              ],
-            ),
+              );
+            },
           );
         }
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(switch (_section) {
-              _HomeSection.whatToEat => 'Что поесть',
-              _HomeSection.home => 'Главная',
-              _HomeSection.meal => 'План питания',
-              _HomeSection.workout => 'План тренировок',
-            }),
-            actions: [
-              IconButton(
-                onPressed: _toSettings,
-                icon: const Icon(Icons.settings),
-                tooltip: 'Настройки',
+        return ListenableBuilder(
+          listenable: widget.appState,
+          builder: (context, _) {
+            return Scaffold(
+              appBar: AppBar(
+                title: Text(switch (_section) {
+                  _HomeSection.whatToEat => 'Что поесть',
+                  _HomeSection.home => 'Главная',
+                  _HomeSection.calories => 'Подсчёт калорий',
+                  _HomeSection.meal => widget.appState.hasMealPlan
+                      ? 'План питания'
+                      : 'Питание',
+                  _HomeSection.workout => 'План тренировок',
+                }),
+                actions: [
+                  IconButton(
+                    onPressed: _toSettings,
+                    icon: const Icon(Icons.settings),
+                    tooltip: 'Настройки',
+                  ),
+                ],
               ),
-            ],
-          ),
-          drawer: _DrawerContent(
-            section: _section,
-            onSelect: (s) {
-              setState(() => _section = s);
-              Navigator.of(context).pop();
-            },
-          ),
-          body: _DashboardScaffold(
-            appState: widget.appState,
-            section: _section,
-            onCalories: _toCalories,
-            onSettings: _toSettings,
-            showAppBar: false,
-          ),
+              drawer: _DrawerContent(
+                section: _section,
+                nutritionUnlocked: widget.appState.hasMealPlan,
+                onSelect: (s) {
+                  setState(() => _section = s);
+                  Navigator.of(context).pop();
+                },
+              ),
+              body: _DashboardScaffold(
+                appState: widget.appState,
+                section: _section,
+                onSettings: _toSettings,
+                showAppBar: false,
+              ),
+            );
+          },
         );
       },
     );
@@ -150,12 +157,15 @@ class _DesktopRail extends StatelessWidget {
     required this.expanded,
     required this.onToggle,
     required this.section,
+    required this.nutritionUnlocked,
     required this.onSelect,
   });
 
   final bool expanded;
   final VoidCallback onToggle;
   final _HomeSection section;
+  /// Полные разделы «Что поесть» и «Подсчёт» после кнопки «К плану».
+  final bool nutritionUnlocked;
   final void Function(_HomeSection) onSelect;
 
   @override
@@ -186,13 +196,15 @@ class _DesktopRail extends StatelessWidget {
             if (expanded) const Divider(height: 1),
             if (expanded) ...[
               const SizedBox(height: 8),
-              _NavRow(
-                icon: Icons.restaurant_menu,
-                label: 'Что поесть',
-                selected: section == _HomeSection.whatToEat,
-                onTap: () => onSelect(_HomeSection.whatToEat),
-                primary: primary,
-              ),
+              if (nutritionUnlocked) ...[
+                _NavRow(
+                  icon: Icons.restaurant_menu,
+                  label: 'Что поесть',
+                  selected: section == _HomeSection.whatToEat,
+                  onTap: () => onSelect(_HomeSection.whatToEat),
+                  primary: primary,
+                ),
+              ],
               _NavRow(
                 icon: Icons.home_outlined,
                 label: 'Главная',
@@ -200,13 +212,30 @@ class _DesktopRail extends StatelessWidget {
                 onTap: () => onSelect(_HomeSection.home),
                 primary: primary,
               ),
-              _NavRow(
-                icon: Icons.restaurant,
-                label: 'План питания',
-                selected: section == _HomeSection.meal,
-                onTap: () => onSelect(_HomeSection.meal),
-                primary: primary,
-              ),
+              if (nutritionUnlocked) ...[
+                _NavRow(
+                  icon: Icons.calculate,
+                  label: 'Подсчёт калорий',
+                  selected: section == _HomeSection.calories,
+                  onTap: () => onSelect(_HomeSection.calories),
+                  primary: primary,
+                ),
+                _NavRow(
+                  icon: Icons.restaurant,
+                  label: 'План питания',
+                  selected: section == _HomeSection.meal,
+                  onTap: () => onSelect(_HomeSection.meal),
+                  primary: primary,
+                ),
+              ] else ...[
+                _NavRow(
+                  icon: Icons.restaurant_menu,
+                  label: 'Питание',
+                  selected: section == _HomeSection.meal,
+                  onTap: () => onSelect(_HomeSection.meal),
+                  primary: primary,
+                ),
+              ],
               _NavRow(
                 icon: Icons.fitness_center,
                 label: 'План тренировок',
@@ -254,39 +283,84 @@ class _NavRow extends StatelessWidget {
 }
 
 class _DrawerContent extends StatelessWidget {
-  const _DrawerContent({required this.section, required this.onSelect});
+  const _DrawerContent({
+    required this.section,
+    required this.nutritionUnlocked,
+    required this.onSelect,
+  });
 
   final _HomeSection section;
+  final bool nutritionUnlocked;
   final void Function(_HomeSection) onSelect;
 
   @override
   Widget build(BuildContext context) {
-    return NavigationDrawer(
-      selectedIndex: section.index,
-      onDestinationSelected: (i) {
-        onSelect(_HomeSection.values[i]);
-      },
-      header: const DrawerHeader(
-        child: Align(
-          alignment: Alignment.bottomLeft,
-          child: Text(
-            'My Pro Health\nNutrition',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-          ),
+    const header = DrawerHeader(
+      child: Align(
+        alignment: Alignment.bottomLeft,
+        child: Text(
+          'My Pro Health\nNutrition',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
       ),
+    );
+    if (nutritionUnlocked) {
+      return NavigationDrawer(
+        selectedIndex: section.index,
+        onDestinationSelected: (i) {
+          onSelect(_HomeSection.values[i]);
+        },
+        header: header,
+        children: const [
+          NavigationDrawerDestination(
+            icon: Icon(Icons.restaurant_menu),
+            label: Text('Что поесть'),
+          ),
+          NavigationDrawerDestination(
+            icon: Icon(Icons.home_outlined),
+            label: Text('Главная'),
+          ),
+          NavigationDrawerDestination(
+            icon: Icon(Icons.calculate),
+            label: Text('Подсчёт калорий'),
+          ),
+          NavigationDrawerDestination(
+            icon: Icon(Icons.restaurant),
+            label: Text('План питания'),
+          ),
+          NavigationDrawerDestination(
+            icon: Icon(Icons.fitness_center),
+            label: Text('План тренировок'),
+          ),
+        ],
+      );
+    }
+    final idx = switch (section) {
+      _HomeSection.home => 0,
+      _HomeSection.meal => 1,
+      _HomeSection.workout => 2,
+      _ => 1,
+    };
+    return NavigationDrawer(
+      selectedIndex: idx,
+      onDestinationSelected: (i) {
+        onSelect(
+          switch (i) {
+            0 => _HomeSection.home,
+            1 => _HomeSection.meal,
+            _ => _HomeSection.workout,
+          },
+        );
+      },
+      header: header,
       children: const [
-        NavigationDrawerDestination(
-          icon: Icon(Icons.restaurant_menu),
-          label: Text('Что поесть'),
-        ),
         NavigationDrawerDestination(
           icon: Icon(Icons.home_outlined),
           label: Text('Главная'),
         ),
         NavigationDrawerDestination(
-          icon: Icon(Icons.restaurant),
-          label: Text('План питания'),
+          icon: Icon(Icons.restaurant_menu),
+          label: Text('Питание'),
         ),
         NavigationDrawerDestination(
           icon: Icon(Icons.fitness_center),
@@ -301,14 +375,12 @@ class _DashboardScaffold extends StatelessWidget {
   const _DashboardScaffold({
     required this.appState,
     required this.section,
-    required this.onCalories,
     required this.onSettings,
     this.showAppBar = true,
   });
 
   final AppState appState;
   final _HomeSection section;
-  final VoidCallback onCalories;
   final VoidCallback onSettings;
   final bool showAppBar;
 
@@ -322,7 +394,8 @@ class _DashboardScaffold extends StatelessWidget {
               switch (section) {
                 _HomeSection.whatToEat => 'Что поесть',
                 _HomeSection.home => 'Главная',
-                _HomeSection.meal => 'План питания',
+                _HomeSection.calories => 'Подсчёт калорий',
+                _HomeSection.meal => appState.hasMealPlan ? 'План питания' : 'Питание',
                 _HomeSection.workout => 'План тренировок',
               },
             ),
@@ -337,7 +410,8 @@ class _DashboardScaffold extends StatelessWidget {
         Expanded(
           child: switch (section) {
             _HomeSection.whatToEat => WhatToEatPage(appState: appState),
-            _HomeSection.home => _HomeBody(appState: appState, onCalories: onCalories),
+            _HomeSection.home => _HomeBody(appState: appState),
+            _HomeSection.calories => FoodDiaryPage(appState: appState),
             _HomeSection.meal => MealPlanView(appState: appState),
             _HomeSection.workout => WorkoutPlanView(appState: appState),
           },
@@ -348,10 +422,9 @@ class _DashboardScaffold extends StatelessWidget {
 }
 
 class _HomeBody extends StatelessWidget {
-  const _HomeBody({required this.appState, required this.onCalories});
+  const _HomeBody({required this.appState});
 
   final AppState appState;
-  final VoidCallback onCalories;
 
   @override
   Widget build(BuildContext context) {
@@ -420,29 +493,7 @@ class _HomeBody extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 24),
-        if (!appState.hasMealPlan)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Text(
-              'У вас нет плана питания',
-              textAlign: TextAlign.center,
-              style: t.titleMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        FilledButton(
-          key: const Key('dashboard_calories'),
-          onPressed: onCalories,
-          style: FilledButton.styleFrom(
-            backgroundColor: primary,
-            foregroundColor: isDark ? Colors.black : Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-          ),
-          child: const Text('Подсчёт калорий'),
-        ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 32),
         if (p.goal != null)
           Card(
             child: ExpansionTile(

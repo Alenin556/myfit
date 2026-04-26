@@ -49,11 +49,6 @@ class AppState extends ChangeNotifier {
     _user = _storage.loadUser();
     _themeMode = _storage.loadTheme();
     _hasMealPlan = _storage.loadHasMealPlan();
-    // План может считаться сформированным, если в профиле уже есть полные данные для расчёта.
-    if (_user != null && _user!.canComputeBmr && !_hasMealPlan) {
-      _hasMealPlan = true;
-      await _storage.saveHasMealPlan(true);
-    }
     final s = _storage.loadSessionActive();
     // Нет ключа: считаем сессию активной только при наличии профиля (миграция).
     _sessionActive = s ?? (_user != null);

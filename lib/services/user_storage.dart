@@ -14,6 +14,8 @@ class UserStorage {
   static const _kTheme = 'app_theme_mode';
   static const _kMealPlan = 'has_meal_plan';
   static const _kSession = 'session_active';
+  /// JSON: `{ "yyyy-MM-dd": [ { food diary entry }, ... ] }`
+  static const _kFoodDiaryV1 = 'food_diary_v1';
 
   static Future<UserStorage> open() async {
     final p = await SharedPreferences.getInstance();
@@ -68,4 +70,16 @@ class UserStorage {
   }
 
   Future<void> saveSessionActive(bool value) => _p.setBool(_kSession, value);
+
+  String? loadFoodDiaryV1() {
+    return _p.getString(_kFoodDiaryV1);
+  }
+
+  Future<void> saveFoodDiaryV1(String? json) async {
+    if (json == null || json.isEmpty) {
+      await _p.remove(_kFoodDiaryV1);
+    } else {
+      await _p.setString(_kFoodDiaryV1, json);
+    }
+  }
 }

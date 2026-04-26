@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import 'app_state.dart';
 import 'app_theme.dart';
 import 'bmr_entry_page.dart';
-import 'calorie_counter_page.dart';
+import 'food_diary_page.dart';
 import 'models/user_profile.dart';
 import 'personal_goal.dart';
 import 'registration_page.dart';
+import 'widgets/nutrition_plan_gate.dart';
 import 'services/daily_menu_generator.dart';
 import 'services/food_product_repository.dart';
 import 'services/meal_plan_narrative.dart'
@@ -26,22 +27,12 @@ class _MealPlanViewState extends State<MealPlanView> {
   final _gen = DailyMenuGenerator(FoodProductRepository());
   final _pdf = MenuPdfService();
   final _note = TextEditingController();
-  final _wFrom = TextEditingController();
-  final _wTo = TextEditingController();
-  String? _weightRangeError;
   bool _saving = false;
-  bool _savingRange = false;
   bool _pdfBusy = false;
   int? _menuTargetKcal;
   int? _menuSeed;
   bool? _menuWeightOk;
   Future<GeneratedMenu>? _menuFuture;
-  /// Когда [AppState.hasMealPlan] — блок цели/заметок скрыт, пока не нажмут «Поставить новую цель».
-  bool _goalBlockExpanded = false;
-  /// Выбранный шаг 2, 4, 6, 8 или 10 кг (набор/снижение).
-  int? _selectedWeightStepKg;
-  static const List<int> _weightSteps = [2, 4, 6, 8, 10];
-
   void _onAppStateChanged() {
     if (mounted) {
       setState(() {});
@@ -52,68 +43,13 @@ class _MealPlanViewState extends State<MealPlanView> {
   void initState() {
     super.initState();
     widget.appState.addListener(_onAppStateChanged);
-    _syncWeightFields(widget.appState.user);
-    _wFrom.addListener(_onFromWeightChanged);
     _note.text = widget.appState.user?.mealPlanNote ?? '';
-    final tw = widget.appState.user?.targetWeightChangeKg;
-    if (tw != null && _weightSteps.contains(tw)) {
-      _recomputeToFromStep(tw);
-    }
-  }
-
-  void _syncWeightFields(UserProfile? p) {
-    if (p == null) {
-      return;
-    }
-    _selectedWeightStepKg = p.targetWeightChangeKg;
-    final from = p.goalWeightFromKg ?? p.weight;
-    _wFrom.text = from == from.roundToDouble() ? '${from.toInt()}' : from.toStringAsFixed(1);
-    if (p.goalWeightToKg != null) {
-      final t = p.goalWeightToKg!;
-      _wTo.text = t == t.roundToDouble() ? '${t.toInt()}' : t.toStringAsFixed(1);
-    } else {
-      _wTo.text = '';
-    }
-  }
-
-  void _onFromWeightChanged() {
-    if (!mounted) {
-      return;
-    }
-    final step = _selectedWeightStepKg;
-    if (step == null) {
-      return;
-    }
-    _recomputeToFromStep(step);
-  }
-
-  void _recomputeToFromStep(int step) {
-    final p0 = widget.appState.user;
-    if (p0 == null) {
-      return;
-    }
-    if (p0.goal != PersonalGoal.gain && p0.goal != PersonalGoal.lose) {
-      return;
-    }
-    final fromS = _wFrom.text.trim().replaceAll(',', '.');
-    final from = double.tryParse(fromS);
-    if (from == null) {
-      return;
-    }
-    final to = p0.goal == PersonalGoal.gain ? from + step : from - step;
-    if (to < 30 || to > 300) {
-      return;
-    }
-    _wTo.text = to == to.roundToDouble() ? '${to.toInt()}' : to.toStringAsFixed(1);
   }
 
   @override
   void dispose() {
-    _wFrom.removeListener(_onFromWeightChanged);
     widget.appState.removeListener(_onAppStateChanged);
     _note.dispose();
-    _wFrom.dispose();
-    _wTo.dispose();
     super.dispose();
   }
 
@@ -149,7 +85,9 @@ class _MealPlanViewState extends State<MealPlanView> {
       if (!p.isWeightGoalRangeValid) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Сохраните корректный диапазон веса (от/до) перед экспортом.'),
+            content: Text(
+              'Сохраните цель по весу в «Данные для расчёта калорий» перед экспортом.',
+            ),
           ),
         );
         return;
@@ -181,110 +119,6 @@ class _MealPlanViewState extends State<MealPlanView> {
       return;
     }
     setState(() => _pdfBusy = false);
-  }
-
-  Future<void> _updateGoal(PersonalGoal g) async {
-    final p0 = widget.appState.user;
-    if (p0 == null) {
-      return;
-    }
-    await widget.appState.setUser(
-      p0.copyWith(
-        goal: g,
-        clearWeightGoalRange: g == PersonalGoal.maintain,
-      ),
-    );
-    if (mounted) {
-      _syncWeightFields(widget.appState.user);
-      setState(() {});
-    }
-  }
-
-  Future<void> _saveWeightRange(UserProfile p) async {
-    if (p.goal != PersonalGoal.gain && p.goal != PersonalGoal.lose) {
-      return;
-    }
-    setState(() {
-      _weightRangeError = null;
-    });
-    final step = _selectedWeightStepKg;
-    if (step == null || !_weightSteps.contains(step)) {
-      setState(
-        () => _weightRangeError = 'Выберите шаг изменения веса: 2, 4, 6, 8 или 10 кг',
-      );
-      return;
-    }
-    final fromS = _wFrom.text.trim().replaceAll(',', '.');
-    final toS = _wTo.text.trim().replaceAll(',', '.');
-    final from = double.tryParse(fromS);
-    final to = double.tryParse(toS);
-    if (from == null) {
-      setState(() => _weightRangeError = 'Укажите вес «От»');
-      return;
-    }
-    if (to == null) {
-      setState(() => _weightRangeError = 'Сначала выберите шаг — поле «До» рассчитается автоматически');
-      return;
-    }
-    if (from < 30 || from > 300 || to < 30 || to > 300) {
-      setState(() => _weightRangeError = 'Вес в допустимом диапазоне 30–300 кг');
-      return;
-    }
-    if (p.goal == PersonalGoal.lose && to >= from) {
-      setState(() => _weightRangeError = 'При снижении веса цель «До» должна быть меньше «От»');
-      return;
-    }
-    if (p.goal == PersonalGoal.gain && to <= from) {
-      setState(() => _weightRangeError = 'При наборе веса цель «До» должна быть больше «От»');
-      return;
-    }
-    final d = (to - from).abs();
-    if ((d - step).abs() > 0.2) {
-      setState(
-        () => _weightRangeError = '«От» и «До» должны отличаться на выбранный шаг ($step кг)',
-      );
-      return;
-    }
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Сохранить цель по весу?'),
-        content: Text(
-          'От ${from.toStringAsFixed(1)} кг → до ${to.toStringAsFixed(1)} кг',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Сохранить'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !mounted) {
-      return;
-    }
-    setState(() => _savingRange = true);
-    await widget.appState.setUser(
-      p.copyWith(
-        goalWeightFromKg: from,
-        goalWeightToKg: to,
-        targetWeightChangeKg: step,
-      ),
-    );
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _savingRange = false;
-      _weightRangeError = null;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Цель по весу сохранена')),
-    );
   }
 
   Future<void> _startNewPlan() async {
@@ -329,14 +163,11 @@ class _MealPlanViewState extends State<MealPlanView> {
     }
     setState(() {
       _note.clear();
-      _weightRangeError = null;
-      _goalBlockExpanded = true;
       _menuTargetKcal = null;
       _menuSeed = null;
       _menuWeightOk = null;
       _menuFuture = null;
     });
-    _syncWeightFields(widget.appState.user);
     if (!mounted) {
       return;
     }
@@ -372,6 +203,9 @@ class _MealPlanViewState extends State<MealPlanView> {
           );
         },
       );
+    }
+    if (!widget.appState.hasMealPlan) {
+      return NutritionPlanGate(appState: widget.appState);
     }
     final bmr = computeBmrMifflin(
       weightKg: p.weight,
@@ -420,7 +254,6 @@ class _MealPlanViewState extends State<MealPlanView> {
       targetKcal: targetKcal,
     );
     final sendSummary = _buildSendSummary(p, targetKcal: targetKcal);
-    final hideGoalPanel = widget.appState.hasMealPlan && !_goalBlockExpanded;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primary = isDark ? AppTheme.darkAccent : AppTheme.lightAccent;
@@ -506,132 +339,10 @@ class _MealPlanViewState extends State<MealPlanView> {
           ),
           const SizedBox(height: 8),
           Text(
-            p.goal == PersonalGoal.lose
-                ? 'На сколько снизить вес: шаг 2–10 кг. Затем укажите вес «От» — «До» подставится.'
-                : 'На сколько увеличить вес: шаг 2–10 кг. Укажите вес «От» — «До» подставится автоматически.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: variant,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            p.goal == PersonalGoal.lose
-                ? 'На сколько снизить вес'
-                : 'На сколько увеличить вес',
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final s in _weightSteps)
-                ChoiceChip(
-                  label: Text('$s кг'),
-                  selected: _selectedWeightStepKg == s,
-                  onSelected: (sel) {
-                    if (!sel) {
-                      return;
-                    }
-                    setState(() {
-                      _selectedWeightStepKg = s;
-                      if (_wFrom.text.trim().isEmpty) {
-                        final w = p.weight;
-                        _wFrom.text = w == w.roundToDouble()
-                            ? '${w.toInt()}'
-                            : w.toStringAsFixed(1);
-                      }
-                      _recomputeToFromStep(s);
-                    });
-                  },
+            'Для набора и снижения веса укажите и сохраните шаг и диапазон «От—До» в «Данные для расчёта калорий» (кнопка «Перейти к расчёту», если расчёт ещё не выполнен).',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: variant,
                 ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          LayoutBuilder(
-            builder: (context, c) {
-              const weightHint = 'Рассчитывается от «От» и выбранного шага';
-              final hintStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: variant,
-                  );
-              final narrow = c.maxWidth < 400;
-              final fromField = TextField(
-                controller: _wFrom,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'От, кг (текущий/стартовый вес)',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              );
-              final toField = TextField(
-                controller: _wTo,
-                readOnly: true,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'До, кг (по шагу)',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              );
-              if (narrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    fromField,
-                    const SizedBox(height: 12),
-                    toField,
-                    const SizedBox(height: 6),
-                    Text(weightHint, style: hintStyle),
-                  ],
-                );
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(flex: 1, child: fromField),
-                      const SizedBox(width: 12),
-                      Expanded(flex: 1, child: toField),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(weightHint, style: hintStyle),
-                ],
-              );
-            },
-          ),
-          if (_weightRangeError != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              _weightRangeError!,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-                fontSize: 13,
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton.tonal(
-              onPressed: _savingRange
-                  ? null
-                  : () => _saveWeightRange(p),
-              child: _savingRange
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Сохранить цель по весу'),
-            ),
           ),
         ],
         const SizedBox(height: 20),
@@ -652,7 +363,7 @@ class _MealPlanViewState extends State<MealPlanView> {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                'Укажите и сохраните корректный диапазон веса в полях «От» и «До» '
+                'Укажите и сохраните цель по весу в «Данные для расчёта калорий» '
                 '— пример меню и PDF будут доступны после сохранения.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
@@ -718,76 +429,30 @@ class _MealPlanViewState extends State<MealPlanView> {
             const SizedBox(height: 4),
         ],
         const SizedBox(height: 24),
-        if (hideGoalPanel) ...[
-          OutlinedButton(
-            onPressed: () {
-              setState(() {
-                _goalBlockExpanded = true;
-              });
-            },
-            child: const Text('Поставить новую цель'),
+        TextField(
+          controller: _note,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'Личные заметки (необязательно)',
+            border: OutlineInputBorder(),
           ),
-          const SizedBox(height: 20),
-        ] else ...[
-          const Text('Цель', style: TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final g in PersonalGoal.values)
-                ChoiceChip(
-                  label: Text(personalGoalLabel(g)),
-                  selected: p.goal == g,
-                  onSelected: (s) {
-                    if (s) {
-                      _updateGoal(g);
-                    }
-                  },
-                ),
-            ],
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton.tonal(
+            onPressed: _saving ? null : _save,
+            child: const Text('Сохранить заметки'),
           ),
-          const SizedBox(height: 8),
-          Text(p.summaryLine, style: Theme.of(context).textTheme.bodyLarge),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _note,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Личные заметки (необязательно)',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.tonal(
-              onPressed: _saving ? null : _save,
-              child: const Text('Сохранить заметки'),
-            ),
-          ),
-          if (widget.appState.hasMealPlan) ...[
-            const SizedBox(height: 4),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: () {
-                  setState(() {
-                    _goalBlockExpanded = false;
-                  });
-                },
-                child: const Text('Свернуть'),
-              ),
-            ),
-          ],
-          const SizedBox(height: 20),
-        ],
+        ),
+        const SizedBox(height: 20),
         FilledButton(
           onPressed: () {
             Navigator.of(context).push(
               PageRouteBuilder<void>(
-                pageBuilder: (c, a, b) =>
-                    CalorieCounterPage(bmr: bmr, goal: p.goal!),
+                pageBuilder: (c, a, b) => FoodDiaryPage(
+                  appState: widget.appState,
+                ),
                 transitionsBuilder: (c, a, s, w) {
                   return FadeTransition(opacity: a, child: w);
                 },
@@ -818,12 +483,6 @@ class _MealPlanViewState extends State<MealPlanView> {
                 },
           child: const Text('Отправить план (почта / Telegram)'),
         ),
-        const SizedBox(height: 24),
-        if (!widget.appState.hasMealPlan)
-          Text(
-            'Используйте расчёты в приложении как ориентир; план согласуйте с врачом.',
-            style: TextStyle(color: variant),
-          ),
       ],
     );
   }
@@ -1002,13 +661,7 @@ class _NeedBmr extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.restaurant, size: 48),
-            const SizedBox(height: 12),
-            Text(
-              'Сначала введите данные для расчёта калорий (цель, активность) — в разделе «Подсчёт калорий» на главной. Рост задаётся при регистрации (профиль).',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             FilledButton(
               onPressed: onOpen,
               child: const Text('Перейти к расчёту'),

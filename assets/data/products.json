@@ -520,5 +520,140 @@
     "fatG": 100.0,
     "carbG": 0.0,
     "tag": "fat"
+  },
+  {
+    "id": "casein_slow",
+    "name": "Казеин (медленный белок)",
+    "kcalPer100g": 360,
+    "proteinG": 75.0,
+    "fatG": 4.0,
+    "carbG": 8.0,
+    "tag": "protein"
+  },
+  {
+    "id": "skyr",
+    "name": "Скир (йогурт исландский)",
+    "kcalPer100g": 66,
+    "proteinG": 10.5,
+    "fatG": 0.2,
+    "carbG": 3.6,
+    "tag": "dairy"
+  },
+  {
+    "id": "ricotta",
+    "name": "Рикотта",
+    "kcalPer100g": 158,
+    "proteinG": 11.0,
+    "fatG": 10.0,
+    "carbG": 4.0,
+    "tag": "dairy"
+  },
+  {
+    "id": "natural_yogurt",
+    "name": "Йогурт натуральный 3,2%",
+    "kcalPer100g": 64,
+    "proteinG": 4.5,
+    "fatG": 3.2,
+    "carbG": 4.0,
+    "tag": "dairy"
+  },
+  {
+    "id": "protein_bar",
+    "name": "Протеиновый батончик",
+    "kcalPer100g": 350,
+    "proteinG": 25.0,
+    "fatG": 12.0,
+    "carbG": 35.0,
+    "tag": "protein"
+  },
+  {
+    "id": "hazelnuts",
+    "name": "Фундук",
+    "kcalPer100g": 620,
+    "proteinG": 15.0,
+    "fatG": 52.0,
+    "carbG": 12.0,
+    "tag": "fat"
+  },
+  {
+    "id": "cashews",
+    "name": "Кешью",
+    "kcalPer100g": 570,
+    "proteinG": 18.0,
+    "fatG": 42.0,
+    "carbG": 27.0,
+    "tag": "fat"
+  },
+  {
+    "id": "blueberry",
+    "name": "Черника (свежая)",
+    "kcalPer100g": 44,
+    "proteinG": 0.7,
+    "fatG": 0.3,
+    "carbG": 7.5,
+    "tag": "fruit"
+  },
+  {
+    "id": "pistachios",
+    "name": "Фисташки",
+    "kcalPer100g": 560,
+    "proteinG": 20.0,
+    "fatG": 45.0,
+    "carbG": 15.0,
+    "tag": "fat"
+  },
+  {
+    "id": "brynza",
+    "name": "Брынза (лёгкая)",
+    "kcalPer100g": 215,
+    "proteinG": 15.0,
+    "fatG": 15.0,
+    "carbG": 2.0,
+    "tag": "breakfast"
+  },
+  {
+    "id": "gainer_50",
+    "name": "Гейнер (высокоуглеводный, спортпит)",
+    "kcalPer100g": 380,
+    "proteinG": 15.0,
+    "fatG": 2.0,
+    "carbG": 60.0,
+    "tag": "sports"
+  },
+  {
+    "id": "isotonic_sport",
+    "name": "Изотоник (натрия+углеводы, спортпит)",
+    "kcalPer100g": 24,
+    "proteinG": 0.0,
+    "fatG": 0.0,
+    "carbG": 5.5,
+    "tag": "sports"
+  },
+  {
+    "id": "bcaa_sport",
+    "name": "BCAA+глюкоза (готовый напиток, спортпит)",
+    "kcalPer100g": 85,
+    "proteinG": 5.0,
+    "fatG": 0.0,
+    "carbG": 10.0,
+    "tag": "sports"
+  },
+  {
+    "id": "energy_gel_sport",
+    "name": "Энергетический гель (кардио, спортпит)",
+    "kcalPer100g": 280,
+    "proteinG": 0.0,
+    "fatG": 0.0,
+    "carbG": 65.0,
+    "tag": "sports"
+  },
+  {
+    "id": "eaa_sport",
+    "name": "EAA+электролиты (раствор, спортпит)",
+    "kcalPer100g": 55,
+    "proteinG": 8.0,
+    "fatG": 0.0,
+    "carbG": 3.0,
+    "tag": "sports"
   }
 ]
