@@ -1,0 +1,12 @@
+name = "myfit-telegram-worker"
+main = "src/index.ts"
+compatibility_date = "2026-04-26"
+
+# KV binding (create with: wrangler kv namespace create MYFIT_LINKS)
+kv_namespaces = [
+  { binding = "MYFIT_LINKS", id = "0d87dca6bb804bb79348844b0dca0eaf", preview_id = "0d87dca6bb804bb79348844b0dca0eaf" }
+]
+
+# Secrets (set with: wrangler secret put TELEGRAM_BOT_TOKEN)
+# optional: wrangler secret put APP_API_KEY
+
