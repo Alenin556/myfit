@@ -550,6 +550,10 @@ class _MealPlanViewState extends State<MealPlanView> {
           const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, c) {
+              const weightHint = 'Рассчитывается от «От» и выбранного шага';
+              final hintStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: variant,
+                  );
               final narrow = c.maxWidth < 400;
               final fromField = TextField(
                 controller: _wFrom,
@@ -559,6 +563,7 @@ class _MealPlanViewState extends State<MealPlanView> {
                 decoration: const InputDecoration(
                   labelText: 'От, кг (текущий/стартовый вес)',
                   border: OutlineInputBorder(),
+                  isDense: true,
                 ),
               );
               final toField = TextField(
@@ -570,7 +575,7 @@ class _MealPlanViewState extends State<MealPlanView> {
                 decoration: const InputDecoration(
                   labelText: 'До, кг (по шагу)',
                   border: OutlineInputBorder(),
-                  helperText: 'Рассчитывается от «От» и выбранного шага',
+                  isDense: true,
                 ),
               );
               if (narrow) {
@@ -580,14 +585,24 @@ class _MealPlanViewState extends State<MealPlanView> {
                     fromField,
                     const SizedBox(height: 12),
                     toField,
+                    const SizedBox(height: 6),
+                    Text(weightHint, style: hintStyle),
                   ],
                 );
               }
-              return Row(
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(child: fromField),
-                  const SizedBox(width: 12),
-                  Expanded(child: toField),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 1, child: fromField),
+                      const SizedBox(width: 12),
+                      Expanded(flex: 1, child: toField),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(weightHint, style: hintStyle),
                 ],
               );
             },

@@ -40,6 +40,14 @@ flutter test
 flutter analyze lib
 ```
 
+### Сборка APK (Android, release)
+
+```bash
+flutter build apk --release
+```
+
+Готовый файл: `build/app/outputs/flutter-apk/app-release.apk` (и дубликат в `build/app/outputs/apk/release/`). На системах, где `java` по умолчанию **25+**, Gradle может падать с `IllegalArgumentException: 25.x / 26.x` при разборе версии. В `android/gradle.properties` задано **`org.gradle.java.home`** на [Eclipse Temurin 17](https://adoptium.net/) (при необходимости путь обновите после смены каталога JDK). Альтернатива: перед сборкой `JAVA_HOME=C:\path\to\jdk-17`.
+
 ---
 
 ## Getting Started (Flutter)
