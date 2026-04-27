@@ -73,6 +73,51 @@ const _seafoodIds = <String>{
   'shrimps',
 };
 
+/// Протеин, гейнер, казеин, BCAA/EAA, изотоник — только **Полдник** или **Перед сном**,
+/// и **не вместе** с молочными в одном приёме.
+const _supplementProductIds = <String>{
+  'whey_protein',
+  'casein_slow',
+  'protein_bar',
+  'gainer_50',
+  'bcaa_sport',
+  'eaa_sport',
+  'isotonic_sport',
+};
+
+List<FoodProduct> _menuCatalogNoGel(List<FoodProduct> all) {
+  return all
+      .where((e) => !e.name.toLowerCase().contains('гель'))
+      .toList();
+}
+
+List<FoodProduct> _withoutSupplements(List<FoodProduct> all) {
+  return all.where((e) => !_supplementProductIds.contains(e.id)).toList();
+}
+
+bool _isDairyProduct(FoodProduct e) {
+  if (e.tag == 'dairy') {
+    return true;
+  }
+  const ids = <String>{
+    'cottage_5',
+    'cottage_2',
+    'cottage_9',
+    'cottage_cheese_grainy',
+    'syr_17',
+    'brynza',
+  };
+  return ids.contains(e.id);
+}
+
+List<FoodProduct> _withoutDairyAndSupplements(List<FoodProduct> all) {
+  return all
+      .where(
+        (e) => !_isDairyProduct(e) && !_supplementProductIds.contains(e.id),
+      )
+      .toList();
+}
+
 List<FoodProduct> _productPool(
   List<FoodProduct> all,
   int sortSalt, {
@@ -103,52 +148,60 @@ List<FoodProduct> _productPool(
 }
 
 /// Готовый набор продуктов на день (один [seed] / один вызов [bump]).
+///
+/// Завтрак — каша, яйца, орехи (+фрукт в части вариаций);
+/// **второй завтрак** — злак/хлеб + фрукт, **без** молока и **без** спортдобавок;
+/// **молочка** и **спортдобавки** — только **Полдник** и **Перед сном** (поздний приём);
+/// в одном приёме: **либо** молоко, **либо** добавка.
+/// Ужин — рыба + гарнир + масло.
 class _DayPicks {
   const _DayPicks({
-    required this.mornCarb,
-    required this.mornProt,
-    required this.gainerB,
-    required this.dairy2,
-    required this.fruit1,
-    required this.sport2,
+    required this.bfstPorridge,
+    required this.bfstEgg,
+    required this.bfstNuts,
+    required this.bfstFruit,
+    required this.secondCarb,
+    required this.secondFruit,
     required this.lunchM,
     required this.lunchC,
     required this.lunchSalad,
     required this.lunchOil,
-    required this.lunchIso,
-    required this.snackP,
+    required this.poludnikIsDairy,
+    required this.cottage,
+    required this.eveningDairy,
+    required this.supp,
     required this.snackNut,
     required this.fruitSn,
-    required this.sportSn,
     required this.fishD,
     required this.salD,
     required this.oilD,
-    required this.nightD,
     required this.nightN,
-    required this.nightS,
+    required this.nightFruit,
   });
 
-  final FoodProduct mornCarb;
-  final FoodProduct mornProt;
-  final FoodProduct gainerB;
-  final FoodProduct dairy2;
-  final FoodProduct fruit1;
-  final FoodProduct sport2;
+  final FoodProduct bfstPorridge;
+  final FoodProduct bfstEgg;
+  final FoodProduct bfstNuts;
+  final FoodProduct bfstFruit;
+  /// Гранола/хлеб, без молочки и спортпита.
+  final FoodProduct secondCarb;
+  final FoodProduct secondFruit;
   final FoodProduct lunchM;
   final FoodProduct lunchC;
   final FoodProduct lunchSalad;
   final FoodProduct lunchOil;
-  final FoodProduct lunchIso;
-  final FoodProduct snackP;
+  /// true: полдник = творог, перед сном = добавка. false: наоборот.
+  final bool poludnikIsDairy;
+  final FoodProduct cottage;
+  final FoodProduct eveningDairy;
+  final FoodProduct supp;
   final FoodProduct snackNut;
   final FoodProduct fruitSn;
-  final FoodProduct sportSn;
   final FoodProduct fishD;
   final FoodProduct salD;
   final FoodProduct oilD;
-  final FoodProduct nightD;
   final FoodProduct nightN;
-  final FoodProduct nightS;
+  final FoodProduct nightFruit;
 }
 
 _DayPicks _dayPicks(
@@ -157,21 +210,22 @@ _DayPicks _dayPicks(
   int Function() bump,
   FoodProduct Function(List<FoodProduct>, int) pick,
 ) {
+  final catalog = _menuCatalogNoGel(all);
+  final baseNoSupp = _withoutSupplements(catalog);
+  final noDairyNoSupp = _withoutDairyAndSupplements(catalog);
+
+  const bfstPorridgeIds = <String>['oats', 'buckwheat_dry', 'millet_dry'];
   const carbIds = <String>[
-    'oats', 'granola', 'rye_bread', 'wheat_bread', 'buckwheat_dry', 'rice_dry',
+    'oats', 'granola', 'rye_bread', 'wheat_bread', 'buckwheat_dry', 'millet_dry', 'barley_dry', 'rice_dry',
     'pasta_dry', 'potato', 'sweet_potato', 'quinoa_dry', 'bulgur_dry',
   ];
-  const meatIds = <String>[
-    'egg', 'chicken_breast', 'turkey_breast', 'beefLean', 'pork_tenderloin',
-    'cottage_5', 'cottage_2', 'cottage_9', 'cottage_cheese_grainy',
+  const lunchMeatOnlyIds = <String>[
+    'chicken_breast', 'turkey_breast', 'beefLean', 'pork_tenderloin',
   ];
   const fishDinnerIds = <String>[
     'red_fish', 'white_fish', 'cod_fillet', 'tuna_canned', 'shrimps',
   ];
-  const dairyIds = <String>[
-    'cottage_5', 'greek_yog', 'milk_20', 'kefir_1', 'ryazhenka_4', 'skyr',
-    'ricotta', 'natural_yogurt', 'cottage_2', 'brynza',
-  ];
+  const cottageIds = <String>['cottage_5', 'cottage_2', 'cottage_9', 'cottage_cheese_grainy'];
   const fruitIds = <String>[
     'banana', 'apple', 'kiwi', 'orange', 'pear', 'strawberry', 'blueberry', 'plum',
   ];
@@ -179,171 +233,157 @@ _DayPicks _dayPicks(
     'almonds', 'walnuts', 'hazelnuts', 'cashews', 'pistachios', 'peanut_butter',
     'sunflower_seeds',
   ];
-  const snackProteinIds = <String>[
-    'whey_protein', 'casein_slow', 'protein_bar', 'cottage_5', 'gainer_50', 'cottage_9',
+  const nightDairyIds = <String>[
+    'cottage_5', 'cottage_2', 'cottage_9', 'cottage_cheese_grainy', 'greek_yog', 'kefir_1', 'skyr',
+    'ricotta', 'natural_yogurt', 'milk_20', 'ryazhenka_4', 'brynza',
   ];
-  const nightProteinIds = <String>[
-    'casein_slow', 'cottage_5', 'greek_yog', 'kefir_1', 'whey_protein', 'skyr', 'ricotta',
-  ];
-  const sportsIds = <String>[
-    'gainer_50', 'isotonic_sport', 'bcaa_sport', 'energy_gel_sport', 'eaa_sport', 'whey_protein',
-  ];
+  const secondSnackCarbIds = <String>['granola', 'rye_bread', 'wheat_bread'];
 
-  final pMornCarb = _productPool(
-    all,
+  final pBfstPorridge = _productPool(
+    noDairyNoSupp,
     sortSalt,
-    tags: const ['breakfast', 'carb'],
-    ids: carbIds,
+    tags: const ['carb', 'breakfast'],
+    ids: bfstPorridgeIds,
   );
-  final pMornProtein = _productPool(
-    all,
+  final pBfstEgg = _productPool(
+    noDairyNoSupp,
     sortSalt,
     tags: const ['protein', 'lunch', 'breakfast'],
-    ids: meatIds,
+    ids: const ['egg'],
     excludeIds: _seafoodIds,
   );
-  final pGainer = _productPool(
-    all,
+  final pBfstNuts = _productPool(
+    noDairyNoSupp,
     sortSalt,
-    tags: const ['sports'],
-    ids: const ['gainer_50'],
+    tags: const ['fat', 'sports'],
+    ids: nutIds,
   );
-  final pDairy2 = _productPool(
-    all,
-    sortSalt,
-    tags: const ['dairy', 'breakfast'],
-    ids: dairyIds,
-  );
-  final pFruit = _productPool(
-    all,
+  final pBfstFruit = _productPool(
+    noDairyNoSupp,
     sortSalt,
     tags: const ['fruit'],
     ids: fruitIds,
   );
-  final pSports2 = _productPool(
-    all,
+  final pSecondCarb = _productPool(
+    noDairyNoSupp,
     sortSalt,
-    tags: const ['sports', 'protein'],
-    ids: const ['eaa_sport', 'bcaa_sport', 'gainer_50', 'whey_protein', 'isotonic_sport'],
+    tags: const ['carb', 'breakfast'],
+    ids: secondSnackCarbIds,
+  );
+  final pProteinBar = _productPool(
+    catalog,
+    sortSalt,
+    tags: const ['protein', 'sports'],
+    ids: const ['protein_bar'],
+  );
+  final pWhey = _productPool(
+    catalog,
+    sortSalt,
+    tags: const ['protein', 'dairy', 'lunch', 'breakfast', 'sports'],
+    ids: const ['whey_protein'],
+  );
+  final pFruit1 = _productPool(
+    noDairyNoSupp,
+    sortSalt,
+    tags: const ['fruit'],
+    ids: fruitIds,
+  );
+  final pFruit2 = _productPool(
+    noDairyNoSupp,
+    sortSalt,
+    tags: const ['fruit'],
+    ids: fruitIds,
+  );
+  final pFruitNight = _productPool(
+    noDairyNoSupp,
+    sortSalt,
+    tags: const ['fruit'],
+    ids: fruitIds,
   );
   final pLunchMeat = _productPool(
-    all,
+    noDairyNoSupp,
     sortSalt,
     tags: const ['lunch', 'protein'],
-    ids: const [
-      'chicken_breast', 'turkey_breast', 'beefLean', 'pork_tenderloin', 'egg',
-      'cottage_5', 'cottage_9',
-    ],
+    ids: lunchMeatOnlyIds,
   );
   final pLunchCarb = _productPool(
-    all,
+    noDairyNoSupp,
     sortSalt,
     tags: const ['carb', 'breakfast'],
     ids: carbIds,
   );
   final pVeg = _productPool(
-    all,
+    noDairyNoSupp,
     sortSalt,
     tags: const ['veg'],
     ids: const ['salad_mix', 'cucumber', 'tomato', 'broccoli', 'pepper_sweet', 'cabbage_white'],
   );
   final pFat = _productPool(
-    all,
+    noDairyNoSupp,
     sortSalt,
     tags: const ['fat'],
     ids: const ['olive_oil', 'almonds', 'flax_oil'],
   );
-  final pIsotonic = _productPool(
-    all,
+  final pSnackCottage = _productPool(
+    baseNoSupp,
     sortSalt,
-    tags: const ['sports'],
-    ids: const ['isotonic_sport', 'bcaa_sport'],
-  );
-  final pSnackP = _productPool(
-    all,
-    sortSalt,
-    tags: const ['protein', 'dairy', 'sports', 'breakfast'],
-    ids: snackProteinIds,
+    tags: const ['dairy', 'breakfast', 'protein'],
+    ids: cottageIds,
   );
   final pNuts = _productPool(
-    all,
+    noDairyNoSupp,
     sortSalt,
     tags: const ['fat', 'sports'],
     ids: nutIds,
   );
-  final pFruit2 = _productPool(
-    all,
-    sortSalt,
-    tags: const ['fruit'],
-    ids: fruitIds,
-  );
-  final pSportSnack = _productPool(
-    all,
-    sortSalt,
-    tags: const ['sports', 'protein'],
-    ids: const ['whey_protein', 'bcaa_sport', 'eaa_sport', 'gainer_50', 'energy_gel_sport'],
-  );
   final pFishD = _productPool(
-    all,
+    noDairyNoSupp,
     sortSalt,
     tags: const ['lunch', 'protein'],
     ids: fishDinnerIds,
   );
   final pNightDairy = _productPool(
-    all,
+    baseNoSupp,
     sortSalt,
     tags: const ['dairy', 'protein'],
-    ids: nightProteinIds,
+    ids: nightDairyIds,
   );
   final pNightNuts = _productPool(
-    all,
+    noDairyNoSupp,
     sortSalt,
     tags: const ['fat'],
     ids: nutIds,
   );
-  final pNightSport = _productPool(
-    all,
-    sortSalt,
-    tags: const ['sports', 'protein'],
-    ids: const ['casein_slow', 'whey_protein', 'bcaa_sport', 'eaa_sport', 'gainer_50'],
-  );
-  final pSports = _productPool(
-    all,
-    sortSalt,
-    tags: const [
-      'sports', 'protein', 'dairy', 'carb', 'breakfast', 'lunch', 'fruit', 'fat', 'veg',
-    ],
-    ids: sportsIds,
-  );
 
-  final gBpick = pGainer.isNotEmpty ? pick(pGainer, bump()) : pick(pSports, bump());
-  final s2 = pSports2.isNotEmpty ? pick(pSports2, bump()) : pick(pSports, bump());
-  final lIso = pIsotonic.isNotEmpty ? pick(pIsotonic, bump()) : pick(pSports, bump());
-  final sS = pSportSnack.isNotEmpty ? pick(pSportSnack, bump()) : pick(pSports, bump());
-  final nS = pNightSport.isNotEmpty ? pick(pNightSport, bump()) : pick(pSports, bump());
+  // Батончик / протеин — один сухой сид на [supp]; в паре с молоком — только в полдник+ночь.
+  final useBar = (sortSalt & 1) == 0;
+  final supp = useBar && pProteinBar.isNotEmpty
+      ? pick(pProteinBar, bump())
+      : (pWhey.isNotEmpty ? pick(pWhey, bump()) : pick(pProteinBar, bump()));
+  final poludnikIsDairy = (sortSalt & 0x8) == 0;
 
   return _DayPicks(
-    mornCarb: pick(pMornCarb, bump()),
-    mornProt: pick(pMornProtein, bump()),
-    gainerB: gBpick,
-    dairy2: pick(pDairy2, bump()),
-    fruit1: pick(pFruit, bump()),
-    sport2: s2,
+    bfstPorridge: pick(pBfstPorridge, bump()),
+    bfstEgg: pick(pBfstEgg, bump()),
+    bfstNuts: pick(pBfstNuts, bump()),
+    bfstFruit: pick(pBfstFruit, bump()),
+    secondCarb: pick(pSecondCarb, bump()),
+    secondFruit: pick(pFruit1, bump()),
     lunchM: pick(pLunchMeat, bump()),
     lunchC: pick(pLunchCarb, bump()),
     lunchSalad: pick(pVeg, bump()),
     lunchOil: pick(pFat, bump()),
-    lunchIso: lIso,
-    snackP: pick(pSnackP, bump()),
+    poludnikIsDairy: poludnikIsDairy,
+    cottage: pick(pSnackCottage, bump()),
+    eveningDairy: pick(pNightDairy, bump()),
+    supp: supp,
     snackNut: pick(pNuts, bump()),
     fruitSn: pick(pFruit2, bump()),
-    sportSn: sS,
     fishD: pick(pFishD, bump()),
     salD: pick(pVeg, bump()),
     oilD: pick(pFat, bump()),
-    nightD: pick(pNightDairy, bump()),
     nightN: pick(pNightNuts, bump()),
-    nightS: nS,
+    nightFruit: pick(pFruitNight, bump()),
   );
 }
 
@@ -464,41 +504,55 @@ class DailyMenuGenerator {
         continue;
       }
       if (key == 'Завтрак') {
-        final a = (mealK * 0.48).round();
-        final b = (mealK * 0.35).round();
-        final c = mealK - a - b;
-        addRow('Завтрак', [(d.mornCarb, a), (d.mornProt, b), (d.gainerB, c)]);
+        final withFruit = ((sortSalt >> 2) & 1) == 0;
+        if (withFruit) {
+          final a = (mealK * 0.35).round();
+          final b = (mealK * 0.25).round();
+          final c = (mealK * 0.25).round();
+          final r = mealK - a - b - c;
+          addRow('Завтрак', [
+            (d.bfstPorridge, a),
+            (d.bfstEgg, b),
+            (d.bfstNuts, c),
+            (d.bfstFruit, r),
+          ]);
+        } else {
+          final a = (mealK * 0.40).round();
+          final b = (mealK * 0.35).round();
+          final c = mealK - a - b;
+          addRow('Завтрак', [
+            (d.bfstPorridge, a),
+            (d.bfstEgg, b),
+            (d.bfstNuts, c),
+          ]);
+        }
       } else if (key == 'Второй завтрак') {
-        final a = (mealK * 0.58).round();
-        final b = (mealK * 0.30).round();
-        final c = mealK - a - b;
-        addRow('Второй завтрак', [(d.dairy2, a), (d.fruit1, b), (d.sport2, c)]);
+        final a = (mealK * 0.45).round();
+        final b = mealK - a;
+        addRow('Второй завтрак', [(d.secondCarb, a), (d.secondFruit, b)]);
       } else if (key == 'Обед') {
         final a = (mealK * 0.40).round();
-        final b = (mealK * 0.28).round();
-        final r0 = mealK - a - b;
-        final c0 = (r0 * 0.58).round();
-        final d0 = (r0 * 0.32).round();
-        final e0 = r0 - c0 - d0;
+        final b = (mealK * 0.30).round();
+        final c = (mealK * 0.20).round();
+        final o = mealK - a - b - c;
         addRow(
           'Обед',
           [
             (d.lunchM, a),
             (d.lunchC, b),
-            (d.lunchSalad, c0),
-            (d.lunchOil, d0),
-            (d.lunchIso, e0),
+            (d.lunchSalad, c),
+            (d.lunchOil, o),
           ],
         );
       } else if (key == 'Полдник') {
-        final a = (mealK * 0.40).round();
+        final a = (mealK * 0.45).round();
         final b = (mealK * 0.30).round();
-        final c = (mealK * 0.22).round();
-        final p4 = mealK - a - b - c;
-        addRow(
-          'Полдник',
-          [(d.snackP, a), (d.snackNut, b), (d.fruitSn, c), (d.sportSn, p4)],
-        );
+        final c = mealK - a - b;
+        if (d.poludnikIsDairy) {
+          addRow('Полдник', [(d.cottage, a), (d.snackNut, b), (d.fruitSn, c)]);
+        } else {
+          addRow('Полдник', [(d.supp, a), (d.fruitSn, b), (d.snackNut, c)]);
+        }
       } else if (key == 'Ужин') {
         final a = (mealK * 0.52).round();
         final r1 = mealK - a;
@@ -508,7 +562,11 @@ class DailyMenuGenerator {
         final a = (mealK * 0.60).round();
         final b = (mealK * 0.22).round();
         final c = mealK - a - b;
-        addRow('Перед сном', [(d.nightD, a), (d.nightN, b), (d.nightS, c)]);
+        if (d.poludnikIsDairy) {
+          addRow('Перед сном', [(d.supp, a), (d.nightN, b), (d.nightFruit, c)]);
+        } else {
+          addRow('Перед сном', [(d.eveningDairy, a), (d.nightN, b), (d.nightFruit, c)]);
+        }
       }
     }
 
@@ -562,35 +620,48 @@ class DailyMenuGenerator {
     final mealK = mealKcal;
     final List<(FoodProduct, int)> parts;
     if (mealKey == 'Завтрак') {
-      final a = (mealK * 0.48).round();
-      final b = (mealK * 0.35).round();
-      final c = mealK - a - b;
-      parts = [(d.mornCarb, a), (d.mornProt, b), (d.gainerB, c)];
+      final withFruit = ((sortSalt >> 2) & 1) == 0;
+      if (withFruit) {
+        final a = (mealK * 0.35).round();
+        final b = (mealK * 0.25).round();
+        final c = (mealK * 0.25).round();
+        final r = mealK - a - b - c;
+        parts = [
+          (d.bfstPorridge, a),
+          (d.bfstEgg, b),
+          (d.bfstNuts, c),
+          (d.bfstFruit, r),
+        ];
+      } else {
+        final a = (mealK * 0.40).round();
+        final b = (mealK * 0.35).round();
+        final c = mealK - a - b;
+        parts = [(d.bfstPorridge, a), (d.bfstEgg, b), (d.bfstNuts, c)];
+      }
     } else if (mealKey == 'Второй завтрак') {
-      final a = (mealK * 0.58).round();
-      final b = (mealK * 0.30).round();
-      final c = mealK - a - b;
-      parts = [(d.dairy2, a), (d.fruit1, b), (d.sport2, c)];
+      final a = (mealK * 0.45).round();
+      final b = mealK - a;
+      parts = [(d.secondCarb, a), (d.secondFruit, b)];
     } else if (mealKey == 'Обед') {
       final a = (mealK * 0.40).round();
-      final b = (mealK * 0.28).round();
-      final r0 = mealK - a - b;
-      final c0 = (r0 * 0.58).round();
-      final d0 = (r0 * 0.32).round();
-      final e0 = r0 - c0 - d0;
+      final b = (mealK * 0.30).round();
+      final c = (mealK * 0.20).round();
+      final o = mealK - a - b - c;
       parts = [
         (d.lunchM, a),
         (d.lunchC, b),
-        (d.lunchSalad, c0),
-        (d.lunchOil, d0),
-        (d.lunchIso, e0),
+        (d.lunchSalad, c),
+        (d.lunchOil, o),
       ];
     } else if (mealKey == 'Полдник') {
-      final a = (mealK * 0.40).round();
+      final a = (mealK * 0.45).round();
       final b = (mealK * 0.30).round();
-      final c = (mealK * 0.22).round();
-      final p4 = mealK - a - b - c;
-      parts = [(d.snackP, a), (d.snackNut, b), (d.fruitSn, c), (d.sportSn, p4)];
+      final c = mealK - a - b;
+      if (d.poludnikIsDairy) {
+        parts = [(d.cottage, a), (d.snackNut, b), (d.fruitSn, c)];
+      } else {
+        parts = [(d.supp, a), (d.fruitSn, b), (d.snackNut, c)];
+      }
     } else if (mealKey == 'Ужин') {
       final a = (mealK * 0.52).round();
       final r1 = mealK - a;
@@ -600,7 +671,11 @@ class DailyMenuGenerator {
       final a = (mealK * 0.60).round();
       final b = (mealK * 0.22).round();
       final c = mealK - a - b;
-      parts = [(d.nightD, a), (d.nightN, b), (d.nightS, c)];
+      if (d.poludnikIsDairy) {
+        parts = [(d.supp, a), (d.nightN, b), (d.nightFruit, c)];
+      } else {
+        parts = [(d.eveningDairy, a), (d.nightN, b), (d.nightFruit, c)];
+      }
     } else {
       return null;
     }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'auth/local_auth.dart';
 import 'models/user_profile.dart';
+import 'services/app_icon.dart';
 import 'services/user_storage.dart';
 
 class AppState extends ChangeNotifier {
@@ -53,6 +54,7 @@ class AppState extends ChangeNotifier {
     // Нет ключа: считаем сессию активной только при наличии профиля (миграция).
     _sessionActive = s ?? (_user != null);
     _ready = true;
+    await AppIcon.syncWithTheme(_themeMode);
     notifyListeners();
   }
 
@@ -65,6 +67,7 @@ class AppState extends ChangeNotifier {
   Future<void> setTheme(ThemeMode mode) async {
     _themeMode = mode;
     await _storage.saveTheme(mode);
+    await AppIcon.syncWithTheme(mode);
     notifyListeners();
   }
 

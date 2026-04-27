@@ -65,20 +65,85 @@ int _weeksRangeHigh(double w0, double w1) {
 }
 
 /// Ориентировочные суточные КБЖУ под [targetKcal] и текущий вес в профиле.
+///
+/// Раньше углеводы считались остатком `((ккал − 4·Б − 9·Ж) / 4`. На дефиците
+/// 4·Б+9·Ж нередко **превышал** [targetKcal] → остаток отрицательный, после
+/// [clamp] получались **0 г** углеводов. Сейчас задана **минимальная доля**
+/// калорий на углеводы (~16%, не ниже 40 г), белок и жир **масштабируются**,
+/// чтобы в сумме с углями сходилось с [targetKcal].
 PlanMacroTargets computePlanMacroTargets(UserProfile p, {required int targetKcal}) {
   final w0 = p.weight;
+  if (w0 <= 0 || targetKcal < 1) {
+    return PlanMacroTargets(
+      kcal: targetKcal.clamp(0, 20000),
+      proteinG: 0,
+      fatG: 0,
+      carbG: 0,
+    );
+  }
+  const kPpG = 4.0;
+  const kCalGF = 9.0;
+  const kCalCG = 4.0;
   final pMin = 2.2 * w0;
   final pMax = 2.5 * w0;
   final fMin = 0.8 * w0;
   final fMax = 1.0 * w0;
-  final pMidG = (pMax + pMin) / 2;
-  final fMidG = (fMax + fMin) / 2;
-  final cMid = (targetKcal - 4 * pMidG - 9 * fMidG) / 4;
+  final pMidG = (pMax + pMin) / 2.0;
+  final fMidG = (fMax + fMin) / 2.0;
+  // Минимум углеводов: ~16% суток; на дефиците нельзя показывать 0 г.
+  var carbGMin = (targetKcal * 0.16 / kCalCG).round();
+  if (carbGMin < 40) {
+    carbGMin = 40;
+  }
+  if (kCalCG * carbGMin + 1 >= targetKcal) {
+    while (kCalCG * carbGMin + 1 >= targetKcal && carbGMin > 20) {
+      carbGMin--;
+    }
+  }
+  var kCalPAndF = targetKcal - kCalCG * carbGMin;
+  if (kCalPAndF < 1) {
+    // Очень низкая суточная норма: равные ориентиры по ккал.
+    return PlanMacroTargets(
+      kcal: targetKcal,
+      proteinG: (targetKcal * 0.30 / kPpG).round().clamp(20, 2000),
+      fatG: (targetKcal * 0.30 / kCalGF).round().clamp(15, 2000),
+      carbG: (targetKcal * 0.40 / kCalCG).round().clamp(20, 2000),
+    );
+  }
+  final kP0 = kPpG * pMidG;
+  final kF0 = kCalGF * fMidG;
+  final s = kCalPAndF / (kP0 + kF0);
+  var proteinG = (pMidG * s).round();
+  var fatG = (fMidG * s).round();
+  var carbG = ((targetKcal - kPpG * proteinG - kCalGF * fatG) / kCalCG).round();
+  if (carbG < carbGMin) {
+    carbG = carbGMin;
+    final room = targetKcal - kCalCG * carbG;
+    if (room < 1) {
+      return PlanMacroTargets(
+        kcal: targetKcal,
+        proteinG: (targetKcal * 0.30 / kPpG).round().clamp(20, 2000),
+        fatG: (targetKcal * 0.30 / kCalGF).round().clamp(15, 2000),
+        carbG: (targetKcal * 0.40 / kCalCG).round().clamp(20, 2000),
+      );
+    }
+    final s2 = room / (kP0 + kF0);
+    proteinG = (pMidG * s2).round();
+    fatG = (fMidG * s2).round();
+    carbG = ((targetKcal - kPpG * proteinG - kCalGF * fatG) / kCalCG).round();
+    if (carbG < carbGMin) {
+      carbG = carbGMin;
+    }
+  }
+  final d = targetKcal - (kPpG * proteinG + kCalGF * fatG + kCalCG * carbG);
+  if (d != 0) {
+    carbG = (carbG + (d / kCalCG).round()).clamp(carbGMin, 2000);
+  }
   return PlanMacroTargets(
     kcal: targetKcal,
-    proteinG: pMidG.round(),
-    fatG: fMidG.round(),
-    carbG: cMid.round().clamp(0, 2000),
+    proteinG: proteinG.clamp(0, 2000),
+    fatG: fatG.clamp(0, 2000),
+    carbG: carbG.clamp(carbGMin, 2000),
   );
 }
 

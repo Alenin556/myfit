@@ -4,6 +4,7 @@ import 'app_state.dart';
 import 'app_theme.dart';
 import 'bmr_entry_page.dart';
 import 'food_diary_page.dart';
+import 'models/meal_plan_note.dart';
 import 'models/user_profile.dart';
 import 'personal_goal.dart';
 import 'registration_page.dart';
@@ -26,7 +27,6 @@ class MealPlanView extends StatefulWidget {
 class _MealPlanViewState extends State<MealPlanView> {
   final _gen = DailyMenuGenerator(FoodProductRepository());
   final _pdf = MenuPdfService();
-  final _note = TextEditingController();
   bool _saving = false;
   bool _pdfBusy = false;
   int? _menuTargetKcal;
@@ -43,38 +43,156 @@ class _MealPlanViewState extends State<MealPlanView> {
   void initState() {
     super.initState();
     widget.appState.addListener(_onAppStateChanged);
-    _note.text = widget.appState.user?.mealPlanNote ?? '';
   }
 
   @override
   void dispose() {
     widget.appState.removeListener(_onAppStateChanged);
-    _note.dispose();
     super.dispose();
   }
 
-  Future<void> _save() async {
+  Future<String?> _promptNoteText({String? initial, required String title}) async {
+    final controller = TextEditingController(text: initial);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(title),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLines: 6,
+            minLines: 3,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: 'Текст заметки',
+            ),
+            textInputAction: TextInputAction.newline,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Отмена'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, controller.text),
+              child: const Text('Сохранить'),
+            ),
+          ],
+        );
+      },
+    );
+    // Поддерево диалога снимается с дерева в следующем кадре; синхронный
+    // dispose() контроллера даёт assert '_dependents.isEmpty' в framework.dart.
+    final c = controller;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      c.dispose();
+    });
+    if (result == null) {
+      return null;
+    }
+    return result.trim();
+  }
+
+  Future<void> _persistNotes(List<MealPlanNoteEntry> list) async {
     final p0 = widget.appState.user;
     if (p0 == null) {
       return;
     }
     setState(() => _saving = true);
-    await widget.appState.setUser(
-      p0.copyWith(
-        mealPlanNote: _note.text.trim().isEmpty ? null : _note.text.trim(),
-      ),
-    );
+    await widget.appState.setUser(p0.copyWith(mealPlanNotes: list));
     if (!mounted) {
       return;
     }
     setState(() => _saving = false);
-    await widget.appState.setHasMealPlan(true);
-    if (!mounted) {
-      return;
-    }
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Сохранено в профиле')));
+    ).showSnackBar(const SnackBar(content: Text('Заметки сохранены в профиле')));
+  }
+
+  Future<void> _addNote() async {
+    final t = await _promptNoteText(title: 'Новая заметка');
+    if (t == null || t.isEmpty) {
+      if (t != null && t.isEmpty && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Введите текст заметки')));
+      }
+      return;
+    }
+    final p0 = widget.appState.user;
+    if (p0 == null) {
+      return;
+    }
+    final next = List<MealPlanNoteEntry>.from(p0.mealPlanNotes);
+    next.add(
+      MealPlanNoteEntry(
+        id: 'n${DateTime.now().microsecondsSinceEpoch}',
+        text: t,
+        createdAt: DateTime.now(),
+      ),
+    );
+    await _persistNotes(next);
+  }
+
+  Future<void> _editNote(MealPlanNoteEntry n) async {
+    final t = await _promptNoteText(initial: n.text, title: 'Редактировать заметку');
+    if (t == null) {
+      return;
+    }
+    if (t.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Текст не может быть пустым')));
+      }
+      return;
+    }
+    final p0 = widget.appState.user;
+    if (p0 == null) {
+      return;
+    }
+    final next = p0.mealPlanNotes
+        .map(
+          (e) => e.id == n.id
+              ? MealPlanNoteEntry(
+                  id: e.id,
+                  text: t,
+                  createdAt: e.createdAt,
+                )
+              : e,
+        )
+        .toList();
+    await _persistNotes(next);
+  }
+
+  Future<void> _deleteNote(MealPlanNoteEntry n) async {
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Удалить заметку?'),
+        content: const Text('Это действие нельзя отменить.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (go != true) {
+      return;
+    }
+    final p0 = widget.appState.user;
+    if (p0 == null) {
+      return;
+    }
+    final next = p0.mealPlanNotes.where((e) => e.id != n.id).toList();
+    await _persistNotes(next);
   }
 
   Future<void> _exportPdf(UserProfile p, int targetKcal, double bmr) async {
@@ -162,7 +280,6 @@ class _MealPlanViewState extends State<MealPlanView> {
       return;
     }
     setState(() {
-      _note.clear();
       _menuTargetKcal = null;
       _menuSeed = null;
       _menuWeightOk = null;
@@ -429,21 +546,56 @@ class _MealPlanViewState extends State<MealPlanView> {
             const SizedBox(height: 4),
         ],
         const SizedBox(height: 24),
-        TextField(
-          controller: _note,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: 'Личные заметки (необязательно)',
-            border: OutlineInputBorder(),
-          ),
+        Text(
+          'Личные заметки',
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton.tonal(
-            onPressed: _saving ? null : _save,
-            child: const Text('Сохранить заметки'),
+        if (p.mealPlanNotes.isEmpty)
+          Text(
+            'Заметок пока нет. Добавьте напоминания по питанию, продуктам или режиму.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: variant),
+          )
+        else
+          ...p.mealPlanNotes.map(
+            (n) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Card(
+                child: ListTile(
+                  title: Text(n.text),
+                  subtitle: Text(
+                    '${n.createdAt.day.toString().padLeft(2, '0')}.'
+                    '${n.createdAt.month.toString().padLeft(2, '0')}.'
+                    '${n.createdAt.year}',
+                    style: TextStyle(fontSize: 12, color: variant),
+                  ),
+                  isThreeLine: n.text.length > 80,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        tooltip: 'Изменить',
+                        onPressed: _saving ? null : () => _editNote(n),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: 'Удалить',
+                        onPressed: _saving ? null : () => _deleteNote(n),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: _saving ? null : _addNote,
+          icon: const Icon(Icons.add),
+          label: const Text('Добавить заметку'),
         ),
         const SizedBox(height: 20),
         FilledButton(

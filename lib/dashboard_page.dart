@@ -502,12 +502,19 @@ class _HomeBody extends StatelessWidget {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Text(
-                    p.mealPlanNote != null && p.mealPlanNote!.isNotEmpty
-                        ? p.mealPlanNote!
-                        : p.summaryLine,
-                    style: t.bodyMedium,
-                  ),
+                  child: p.mealPlanNotes.isNotEmpty
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (final n in p.mealPlanNotes)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Text(n.text, style: t.bodyMedium),
+                              ),
+                          ],
+                        )
+                      : Text(p.summaryLine, style: t.bodyMedium),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),

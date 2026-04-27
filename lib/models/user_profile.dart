@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'meal_plan_note.dart';
 import 'weight_entry.dart';
 
 import '../personal_goal.dart' show PersonalGoal, personalGoalLabel;
@@ -21,7 +22,7 @@ class UserProfile {
     this.login,
     this.passwordHash,
     this.passwordSaltB64,
-    this.mealPlanNote,
+    this.mealPlanNotes = const [],
     this.workoutPlan,
     this.workoutPlanNote,
     this.weightHistory = const [],
@@ -45,7 +46,8 @@ class UserProfile {
   final String? login;
   final String? passwordHash;
   final String? passwordSaltB64;
-  final String? mealPlanNote;
+  /// Личные заметки к плану питания (на экране «План питания»).
+  final List<MealPlanNoteEntry> mealPlanNotes;
   final WorkoutPlan? workoutPlan;
   final String? workoutPlanNote;
   final List<WeightEntry> weightHistory;
@@ -126,7 +128,7 @@ class UserProfile {
     String? login,
     String? passwordHash,
     String? passwordSaltB64,
-    String? mealPlanNote,
+    List<MealPlanNoteEntry>? mealPlanNotes,
     WorkoutPlan? workoutPlan,
     String? workoutPlanNote,
     bool clearWorkoutPlan = false,
@@ -153,9 +155,9 @@ class UserProfile {
       login: login ?? this.login,
       passwordHash: passwordHash ?? this.passwordHash,
       passwordSaltB64: passwordSaltB64 ?? this.passwordSaltB64,
-      mealPlanNote: clearMealPlanNote
-          ? null
-          : (mealPlanNote ?? this.mealPlanNote),
+      mealPlanNotes: clearMealPlanNote
+          ? const []
+          : (mealPlanNotes ?? this.mealPlanNotes),
       workoutPlan: clearWorkoutPlan ? null : (workoutPlan ?? this.workoutPlan),
       workoutPlanNote: clearWorkoutPlan
           ? null
@@ -188,7 +190,7 @@ class UserProfile {
       'login': login,
       'passwordHash': passwordHash,
       'passwordSaltB64': passwordSaltB64,
-      'mealPlanNote': mealPlanNote,
+      'mealPlanNotes': mealPlanNotes.map((e) => e.toJson()).toList(),
       'workoutPlan': workoutPlan?.name,
       'workoutPlanNote': workoutPlanNote,
       'weightHistory': weightHistory.map((e) => e.toJson()).toList(),
@@ -217,6 +219,19 @@ class UserProfile {
       }
     }
     final twc = (j['targetWeightChangeKg'] as num?)?.toInt();
+    var mealNotes = _parseMealPlanNotes(j['mealPlanNotes']);
+    if (mealNotes.isEmpty) {
+      final legacy = j['mealPlanNote'] as String?;
+      if (legacy != null && legacy.trim().isNotEmpty) {
+        mealNotes = [
+          MealPlanNoteEntry(
+            id: 'legacy',
+            text: legacy.trim(),
+            createdAt: DateTime.now(),
+          ),
+        ];
+      }
+    }
     return UserProfile(
       name: name,
       username: j['username'] as String?,
@@ -231,7 +246,7 @@ class UserProfile {
       login: j['login'] as String?,
       passwordHash: j['passwordHash'] as String?,
       passwordSaltB64: j['passwordSaltB64'] as String?,
-      mealPlanNote: j['mealPlanNote'] as String?,
+      mealPlanNotes: mealNotes,
       workoutPlan: workoutPlanFromName(j['workoutPlan'] as String?),
       workoutPlanNote: j['workoutPlanNote'] as String?,
       weightHistory: _parseWeightHistory(j['weightHistory']),
@@ -239,6 +254,21 @@ class UserProfile {
       goalWeightToKg: (j['goalWeightToKg'] as num?)?.toDouble(),
       targetWeightChangeKg: twc != null && {2, 4, 6, 8, 10}.contains(twc) ? twc : null,
     );
+  }
+
+  static List<MealPlanNoteEntry> _parseMealPlanNotes(Object? raw) {
+    if (raw is! List) {
+      return const [];
+    }
+    final out = <MealPlanNoteEntry>[];
+    for (final e in raw) {
+      if (e is Map<String, dynamic>) {
+        out.add(MealPlanNoteEntry.fromJson(e));
+      } else if (e is Map) {
+        out.add(MealPlanNoteEntry.fromJson(Map<String, dynamic>.from(e)));
+      }
+    }
+    return out;
   }
 
   static List<WeightEntry> _parseWeightHistory(Object? raw) {

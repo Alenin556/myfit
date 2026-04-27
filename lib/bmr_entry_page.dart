@@ -491,16 +491,26 @@ class _BmrEntryPageState extends State<BmrEntryPage> {
                     ),
                   ),
                 );
-                final toField = TextField(
-                  controller: _wTo,
-                  readOnly: true,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(
+                final toStr =
+                    _wTo.text.isEmpty ? '—' : _wTo.text;
+                final toField = InputDecorator(
+                  decoration: InputDecoration(
                     labelText: 'До, кг (по шагу)',
-                    border: OutlineInputBorder(),
+                    helperText: 'Задаётся только шагом выше, не вводится вручную',
+                    border: const OutlineInputBorder(),
                     isDense: true,
+                    filled: true,
+                    fillColor: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withValues(alpha: 0.45),
+                  ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      toStr,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
                   ),
                 );
                 if (narrow) {

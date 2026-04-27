@@ -1,0 +1,8 @@
+{
+  "name": "app_icon_gen",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "sharp": "^0.33.5"
+  }
+}
